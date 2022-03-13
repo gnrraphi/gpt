@@ -79,7 +79,7 @@ class multi_shift_fom(base_iterative):
         restartlen=20,
         shifts=[],
         checkres=True,
-        rhos=False,
+        saverhos=False,
     )
     def __init__(self, params):
         super().__init__()
@@ -89,7 +89,8 @@ class multi_shift_fom(base_iterative):
         self.restartlen = params["restartlen"]
         self.shifts = params["shifts"]
         self.checkres = params["checkres"]
-        self.rhos = params["rhos"]
+        self.saverhos = params["saverhos"]
+        self.rhos = [] if params["saverhos"] else None
 
     def arnoldi(self, mat, V, rlen):
         H = []
@@ -157,8 +158,8 @@ class multi_shift_fom(base_iterative):
             V = [g.copy(src) for i in range(rlen + 1)]
             V[0] /= r2 ** 0.5
 
-            # return rhos for prec fgmres
-            rr = self.rhos
+            # save rhos for prec multi_shift_fgmres
+            sr = self.saverhos
 
             for k in range(0, self.maxiter, rlen):
 
@@ -166,7 +167,7 @@ class multi_shift_fom(base_iterative):
                 H = self.arnoldi(mat, V, rlen)
 
                 for j, fom in enumerate(sfoms):
-                    if fom.converged is False or rr:
+                    if fom.converged is False or sr:
 
                         t("solve_hessenberg")
                         fom.solve_hessenberg(H, r2)
@@ -191,7 +192,8 @@ class multi_shift_fom(base_iterative):
 
                 if all([fom.converged for fom in sfoms]):
                     self.log(f"converged in {k+rlen} iterations")
-                    return [fom.rho for fom in sfoms] if rr else None
+                    self.rhos = [fom.rho for fom in sfoms] if sr else None
+                    return
 
                 if self.maxiter != rlen:
                     t("restart")
@@ -213,7 +215,7 @@ class multi_shift_fom(base_iterative):
             self.log(
                 f"NOT converged in {k+rlen} iterations; {cs} / {ns} converged shifts"
             )
-            return [fom.rho for fom in sfoms] if rr else None
+            self.rhos = [fom.rho for fom in sfoms] if sr else None
 
         return g.matrix_operator(
             mat=inv,
