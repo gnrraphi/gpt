@@ -20,7 +20,6 @@
 import gpt as g
 import numpy as np
 from gpt.algorithms import base_iterative
-from gpt.algorithms.eigen.arnoldi import arnoldi_iteration
 
 
 class fom(base_iterative):
@@ -32,6 +31,22 @@ class fom(base_iterative):
         self.maxiter = params["maxiter"]
         self.restartlen = params["restartlen"]
         self.checkres = params["checkres"]
+
+    def arnoldi(self, mat, V, rlen):
+        H = []
+        for i in range(rlen):
+            mat(V[i + 1], V[i])
+            ips = np.zeros((i + 2,), np.complex128)
+            g.orthogonalize(
+                V[i + 1],
+                V[0 : i + 1],
+                ips[0:-1],
+                nblock=10,
+            )
+            ips[-1] = g.norm2(V[i + 1]) ** 0.5
+            V[i + 1] /= ips[-1]
+            H.append(ips)
+        return H
 
     def solve_hessenberg(self, H, r2):
         n = len(H)
@@ -76,30 +91,25 @@ class fom(base_iterative):
                 ssq = r2
             rsq = self.eps ** 2.0 * ssq
 
-            g.default.push_verbose("arnoldi", False)
-            a = arnoldi_iteration(mat, r)
-            g.default.pop_verbose()
+            # krylov space
+            V = [g.copy(r) for i in range(rlen + 1)]
+            V[0] /= r2 ** 0.5
 
             for k in range(0, self.maxiter, rlen):
 
                 t("arnoldi")
-                for i in range(rlen):
-                    # for sufficiently small restart length
-                    # should not need second orthogonalization
-                    # step
-                    a(second_orthogonalization=False)
-                Q, H = a.basis, a.H
+                H = self.arnoldi(mat, V, rlen)
 
                 t("solve_hessenberg")
                 y, rn = self.solve_hessenberg(H, r2)
 
                 t("update_psi")
-                g.linear_combination(mmp, Q[0:-1], y)
+                g.linear_combination(mmp, V[0:-1], y)
                 psi += mmp
 
                 if self.maxiter != rlen:
                     t("update_res")
-                    r @= g.eval(Q[-1] * rn)
+                    r @= g.eval(V[-1] * rn)
 
                 t("residual")
                 r2 = np.abs(rn) ** 2.0
@@ -119,8 +129,7 @@ class fom(base_iterative):
 
                 if self.maxiter != rlen:
                     t("restart")
-                    a.basis = [Q[-1]]
-                    a.H = []
+                    V[0] @= g.eval(r / g.norm2(r) ** 0.5)
                     self.debug("performed restart")
 
             msg = f"NOT converged in {k+rlen} iterations"
