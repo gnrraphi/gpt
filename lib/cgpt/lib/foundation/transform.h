@@ -47,7 +47,7 @@ void cgpt_scale_per_coordinate(Lattice<T>& dst,Lattice<T>& src,ComplexD* s,int d
       Coor[idx] = coor[idx];
     });
 
-  if (grid->_simd_layout[0] == 1) {
+  if (grid->_simd_layout[dim] == 1) {
     accelerator_for(idx, osites, T::Nsimd(), {
         int s_idx = Coor[idx];
         coalescedWrite(dst_p[idx], coalescedRead(src_p[idx]) * S[s_idx]);
