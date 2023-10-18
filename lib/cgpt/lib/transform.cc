@@ -223,7 +223,8 @@ EXPORT(lattice_scale_per_coordinate,{
     void* _d,*_s;
     PyObject* _a;
     long dim;
-    if (!PyArg_ParseTuple(args, "llOl", &_d,&_s,&_a,&dim)) {
+    PyObject* _c;
+    if (!PyArg_ParseTuple(args, "llOlO", &_d,&_s,&_a,&dim,&_c)) {
       return NULL;
     }
     
@@ -234,10 +235,15 @@ EXPORT(lattice_scale_per_coordinate,{
     int L;
     cgpt_numpy_import_vector(_a,a,L);
 
-    ASSERT((0 <= dim) && (dim < d->get_grid()->_gdimensions.size()));
-    ASSERT(d->get_grid()->_gdimensions[dim] == L);
+    int32_t* c;
+    int D;
+    cgpt_numpy_import_vector(_c,c,D);
 
-    d->scale_per_coordinate(s,a,dim);
+    ASSERT((0 <= dim) && (dim < d->get_grid()->_fdimensions.size()));
+    ASSERT(d->get_grid()->_fdimensions[dim] == L);
+    ASSERT(d->get_grid()->oSites() * d->get_grid()->Nsimd() == D);
+
+    d->scale_per_coordinate(s,a,dim,c);
     
     return PyLong_FromLong(0);
   });

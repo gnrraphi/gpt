@@ -19,30 +19,37 @@
 */
 
 template<typename T>
-void cgpt_scale_per_coordinate(Lattice<T>& dst,Lattice<T>& src,ComplexD* s,int dim) {
+void cgpt_scale_per_coordinate(Lattice<T>& dst,Lattice<T>& src,ComplexD* s,int dim,int32_t* coor) {
 
   GridBase* grid = dst.Grid();
   conformable(grid, src.Grid());
 
   dst.Checkerboard() = src.Checkerboard();
 
-  int L = grid->_gdimensions[dim];
-    
+  int fdim = grid->_fdimensions[dim];
+  int osites = grid->oSites();
+
   autoView(dst_v, dst, AcceleratorWriteDiscard);
   autoView(src_v, src, AcceleratorRead);
 
   auto dst_p = &dst_v[0];
   auto src_p = &src_v[0];
 
-  Vector<ComplexD> _S(L);
+  Vector<ComplexD> _S(fdim);
   ComplexD* S = &_S[0];
-  thread_for(idx, L, {
+  thread_for(idx, fdim, {
       S[idx] = s[idx];
     });
 
-  if (dim == 0 && grid->_simd_layout[0] == 1) {
-    accelerator_for(idx, grid->oSites(), T::Nsimd(), {
-        int s_idx = idx % L;
+  Vector<int32_t> _Coor(osites);
+  int32_t* Coor = &_Coor[0];
+  thread_for(idx, osites, {
+      Coor[idx] = coor[idx];
+    });
+
+  if (grid->_simd_layout[0] == 1) {
+    accelerator_for(idx, osites, T::Nsimd(), {
+        int s_idx = Coor[idx];
         coalescedWrite(dst_p[idx], coalescedRead(src_p[idx]) * S[s_idx]);
       });
   } else {

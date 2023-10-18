@@ -63,8 +63,8 @@ public:
     return ::axpy(l,(Coeff_t)a,compatible<T>(x)->l,compatible<T>(y)->l);
   }
 
-  virtual void scale_per_coordinate(cgpt_Lattice_base* src,ComplexD* s,int dim) {
-    cgpt_scale_per_coordinate(l,compatible<T>(src)->l,s,dim);
+  virtual void scale_per_coordinate(cgpt_Lattice_base* src,ComplexD* s,int dim,int32_t* coor) {
+    cgpt_scale_per_coordinate(l,compatible<T>(src)->l,s,dim,coor);
   }
 
   virtual RealD norm2() {

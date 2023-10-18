@@ -203,5 +203,6 @@ def where(first, second, third, fourth=None):
 def scale_per_coordinate(d, s, a, dim):
     s = gpt.eval(s)
     assert len(d.otype.v_idx) == len(s.otype.v_idx)
+    coor = gpt.coordinates(s)[:, [dim]].flatten()
     for i in d.otype.v_idx:
-        cgpt.lattice_scale_per_coordinate(d.v_obj[i], s.v_obj[i], a, dim)
+        cgpt.lattice_scale_per_coordinate(d.v_obj[i], s.v_obj[i], a, dim, coor)
