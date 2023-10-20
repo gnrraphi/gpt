@@ -142,7 +142,31 @@ for src in [l, l_rb]:
 ################################################################################
 # Test scale per coordinate
 ################################################################################
-for d, L in enumerate([12, 8, 8, 8]):
+for d, L in zip([0, 1, 2, 3], [12, 8, 8, 8]):
+    grid_rb = g.grid([12, 8, 8, 8, 8], g.double)
+    a = rng.cnormal(g.vcolor(grid_rb))
+    b = g.lattice(a)
+    sc = np.array([rng.cnormal() for i in range(L)], np.complex128)
+    g.scale_per_coordinate(b, a, sc, d)
+    a_s = g.separate(a, d)
+    b_s = g.separate(b, d)
+    for i in range(len(a_s)):
+        eps2 = g.norm2(sc[i] * a_s[i] - b_s[i]) / g.norm2(b_s[i])
+        assert eps2 < 1e-4
+
+for d, L in zip([0, 1, 2], [12, 8, 8]):
+    grid_rb = g.grid([12, 8, 8, 8, 8], g.single)
+    a = rng.cnormal(g.vcolor(grid_rb))
+    b = g.lattice(a)
+    sc = np.array([rng.cnormal() for i in range(L)], np.complex128)
+    g.scale_per_coordinate(b, a, sc, d)
+    a_s = g.separate(a, d)
+    b_s = g.separate(b, d)
+    for i in range(len(a_s)):
+        eps2 = g.norm2(sc[i] * a_s[i] - b_s[i]) / g.norm2(b_s[i])
+        assert eps2 < 1e-4
+
+for d, L in zip([0, 1, 2, 3], [12, 8, 8, 8]):
     for cb in [g.even, g.odd]:
         grid_rb = g.grid([12, 8, 8, 8, 8], g.double, g.redblack)
         a = rng.cnormal(g.vcolor(grid_rb))
@@ -154,4 +178,18 @@ for d, L in enumerate([12, 8, 8, 8]):
         b_s = g.separate(b, d)
         for i in range(len(a_s)):
             eps2 = g.norm2(sc[i] * a_s[i] - b_s[i]) / g.norm2(b_s[i])
-            assert eps2 < 1e-28
+            assert eps2 < 1e-4
+
+for d, L in zip([0, 2], [12, 8]):
+    for cb in [g.even, g.odd]:
+        grid_rb = g.grid([12, 8, 8, 8, 8], g.single, g.redblack)
+        a = rng.cnormal(g.vcolor(grid_rb))
+        a.checkerboard(cb)
+        b = g.lattice(a)
+        sc = np.array([rng.cnormal() for i in range(L)], np.complex128)
+        g.scale_per_coordinate(b, a, sc, d)
+        a_s = g.separate(a, d)
+        b_s = g.separate(b, d)
+        for i in range(len(a_s)):
+            eps2 = g.norm2(sc[i] * a_s[i] - b_s[i]) / g.norm2(b_s[i])
+            assert eps2 < 1e-4

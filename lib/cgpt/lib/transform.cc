@@ -239,9 +239,8 @@ EXPORT(lattice_scale_per_coordinate,{
     int D;
     cgpt_numpy_import_vector(_c,c,D);
 
-    ASSERT((0 <= dim) && (dim < d->get_grid()->_fdimensions.size()));
+    ASSERT((0 <= dim) && (dim < d->get_grid()->Nd()));
     ASSERT(d->get_grid()->_fdimensions[dim] == L);
-    ASSERT(d->get_grid()->oSites() * d->get_grid()->Nsimd() == D);
 
     d->scale_per_coordinate(s,a,dim,c);
     

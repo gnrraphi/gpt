@@ -26,8 +26,16 @@ void cgpt_scale_per_coordinate(Lattice<T>& dst,Lattice<T>& src,ComplexD* s,int d
 
   dst.Checkerboard() = src.Checkerboard();
 
+  int ndim = grid->Nd();
+  int nsimd = grid->Nsimd();
   int fdim = grid->_fdimensions[dim];
   int osites = grid->oSites();
+
+  Coordinate gstride(ndim);
+  gstride[0] = 1;
+  for (int idx=1; idx < ndim; idx++) {
+      gstride[idx] = gstride[idx-1] * grid->_gdimensions[idx-1];
+  }
 
   autoView(dst_v, dst, AcceleratorWriteDiscard);
   autoView(src_v, src, AcceleratorRead);
@@ -41,14 +49,32 @@ void cgpt_scale_per_coordinate(Lattice<T>& dst,Lattice<T>& src,ComplexD* s,int d
       S[idx] = s[idx];
     });
 
+  bool simd = true;
+
   Vector<int32_t> _Coor(osites);
   int32_t* Coor = &_Coor[0];
   thread_for(idx, osites, {
-      Coor[idx] = coor[idx];
+      Coordinate ocoor(ndim);
+      Lexicographic::CoorFromIndex(ocoor,idx,grid->_rdimensions);
+      for (int lane=0; lane < nsimd; lane++) {
+          Coordinate icoor(ndim);
+          grid->iCoorFromIindex(icoor, lane);
+          int lidx=0;
+          for (int nd=0; nd < ndim; nd++) {
+              lidx += (ocoor[nd] + grid->_rdimensions[nd] * icoor[nd]) * gstride[nd];
+          }
+          if (lane == 0) {
+              Coor[idx] = coor[lidx];
+          } else {
+              if (Coor[idx] != coor[idx+lane*osites]) {
+                  simd = false;
+              }
+          }
+      }
     });
 
-  if (grid->_simd_layout[dim] == 1) {
-    accelerator_for(idx, osites, T::Nsimd(), {
+  if (simd) {
+    accelerator_for(idx, osites, nsimd, {
         int s_idx = Coor[idx];
         coalescedWrite(dst_p[idx], coalescedRead(src_p[idx]) * S[s_idx]);
       });
