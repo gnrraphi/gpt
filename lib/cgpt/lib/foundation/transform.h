@@ -89,35 +89,40 @@ void cgpt_scale_per_coordinate(Lattice<T>& dst,Lattice<T>& src,ComplexD* s,int d
     Coordinate gstride(ndim);
     gstride[0] = 1;
     for (int idx=1; idx < ndim; idx++) {
-      gstride[idx] = gstride[idx-1] * grid->_gdimensions[idx-1];
+        gstride[idx] = gstride[idx-1] * grid->_gdimensions[idx-1];
     }
     Vector<int32_t> _Coor(osites);
     int32_t* Coor = &_Coor[0];
-    for(int idx=0; idx < osites; idx++) {
-      Coordinate ocoor(ndim);
-      Lexicographic::CoorFromIndex(ocoor, idx, grid->_rdimensions);
-      for (int lane=0; lane < nsimd; lane++) {
-          Coordinate icoor(ndim);
-          grid->iCoorFromIindex(icoor, lane);
-          int lidx=0;
-          for (int nd=0; nd < ndim; nd++) {
-              lidx += (ocoor[nd] + grid->_rdimensions[nd] * icoor[nd]) * gstride[nd];
-          }
-          if (lane == 0) {
-              Coor[idx] = coor[lidx];
-          }
-          if (Coor[idx] != coor[lidx]) {
-              // Need to update simd separately
-              ERR("Not implemented yet");
-          }
-      }
+    bool simd_seperate = false;
+    thread_for(idx, osites, {
+        Coordinate ocoor(ndim);
+        Lexicographic::CoorFromIndex(ocoor, idx, grid->_rdimensions);
+        for (int lane=0; lane < nsimd; lane++) {
+            Coordinate icoor(ndim);
+            grid->iCoorFromIindex(icoor, lane);
+            int lidx=0;
+            for (int nd=0; nd < ndim; nd++) {
+                lidx += (ocoor[nd] + grid->_rdimensions[nd] * icoor[nd]) * gstride[nd];
+            }
+            if (lane == 0) {
+                Coor[idx] = coor[lidx];
+            }
+            if (Coor[idx] != coor[lidx]) {
+                // Need to update simd separately
+                simd_seperate = true;
+            }
+        }
+    });
+
+    if (simd_seperate) {
+        ERR("Not implemented yet");
     }
 
     // Scale dimension dim
     accelerator_for(idx, osites, nsimd, {
         int s_idx = Coor[idx];
         coalescedWrite(dst_p[idx], coalescedRead(src_p[idx]) * S[s_idx]);
-      }); 
+    }); 
   }
   
 }
