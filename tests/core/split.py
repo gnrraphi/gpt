@@ -180,7 +180,7 @@ for d, L in zip([0, 1, 2, 3], [12, 8, 8, 8]):
             eps2 = g.norm2(sc[i] * a_s[i] - b_s[i]) / g.norm2(b_s[i])
             assert eps2 < 1e-28
 
-for d, L in zip([0, 2], [12, 8]):
+for d, L in zip([0, 1, 2], [12, 8, 8]):
     for cb in [g.even, g.odd]:
         grid_rb = g.grid([12, 8, 8, 8, 8], g.single, g.redblack)
         a = rng.cnormal(g.vcolor(grid_rb))

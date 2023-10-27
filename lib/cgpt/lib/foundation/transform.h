@@ -19,7 +19,7 @@
 */
 
 template<typename T>
-void cgpt_scale_per_coordinate(Lattice<T>& dst,Lattice<T>& src,ComplexD* s,int dim,int32_t* coor) {
+void cgpt_scale_per_coordinate(Lattice<T>& dst,Lattice<T>& src,ComplexD* s,int dim) {
 
   GridBase* grid = dst.Grid();
   conformable(grid, src.Grid());
@@ -29,13 +29,8 @@ void cgpt_scale_per_coordinate(Lattice<T>& dst,Lattice<T>& src,ComplexD* s,int d
   int ndim = grid->Nd();
   int nsimd = grid->Nsimd();
   int fdim = grid->_fdimensions[dim];
+  int gdim = grid->_gdimensions[dim];
   int osites = grid->oSites();
-
-  Coordinate gstride(ndim);
-  gstride[0] = 1;
-  for (int idx=1; idx < ndim; idx++) {
-      gstride[idx] = gstride[idx-1] * grid->_gdimensions[idx-1];
-  }
 
   autoView(dst_v, dst, AcceleratorWriteDiscard);
   autoView(src_v, src, AcceleratorRead);
@@ -49,13 +44,58 @@ void cgpt_scale_per_coordinate(Lattice<T>& dst,Lattice<T>& src,ComplexD* s,int d
       S[idx] = s[idx];
     });
 
-  bool simd = true;
+  if (fdim == gdim && grid->_simd_layout[dim] == 1) {
+    accelerator_for(idx, osites, nsimd, {
+        Coordinate ocoor(ndim);
+        Lexicographic::CoorFromIndex(ocoor, idx, grid->_rdimensions);
+        int s_idx = ocoor[dim];
+        coalescedWrite(dst_p[idx], coalescedRead(src_p[idx]) * S[s_idx]);
+      });
+  } else {
 
-  Vector<int32_t> _Coor(osites);
-  int32_t* Coor = &_Coor[0];
-  thread_for(idx, osites, {
+    // Lexicographic coordinates_from_cartesian_view for dimension dim
+    Coordinate top(ndim);
+    Coordinate size(ndim);
+    int points = 1;
+    for (int idx=0; idx < ndim; idx++) {
+        int cbf = grid->_fdimensions[idx] / grid->_gdimensions[idx];
+        top[idx] = grid->_processor_coor[idx] * grid->_ldimensions[idx] * cbf;
+        size[idx] = grid->_ldimensions[idx] * cbf;
+        points *= size[idx];
+    }
+    int fstride = 1;
+    for (int idx=0; idx < ndim; idx++) {
+        if (grid->_checker_dim_mask[idx])
+            break;
+        fstride *= size[idx];
+    }
+    int cb = src.Checkerboard();
+    std::vector<int32_t> _coor(osites * nsimd);
+    int32_t* coor = &_coor[0];
+    thread_for(idx, points, {
+        Coordinate lcoor(ndim);
+        Lexicographic::CoorFromIndex(lcoor,idx,size);
+        long idx_cb = (idx % fstride) + ((idx / fstride)/2) * fstride;
+        long site_cb = 0;
+        for (int i=0; i < ndim; i++)
+            if (grid->_checker_dim_mask[i])
+                site_cb += top[i] + lcoor[i];
+        if (site_cb % 2 == cb) {
+            coor[idx_cb] = top[dim] + lcoor[dim];
+        }
+    });
+
+    // Compute coordinates for simd
+    Coordinate gstride(ndim);
+    gstride[0] = 1;
+    for (int idx=1; idx < ndim; idx++) {
+      gstride[idx] = gstride[idx-1] * grid->_gdimensions[idx-1];
+    }
+    Vector<int32_t> _Coor(osites);
+    int32_t* Coor = &_Coor[0];
+    for(int idx=0; idx < osites; idx++) {
       Coordinate ocoor(ndim);
-      Lexicographic::CoorFromIndex(ocoor,idx,grid->_rdimensions);
+      Lexicographic::CoorFromIndex(ocoor, idx, grid->_rdimensions);
       for (int lane=0; lane < nsimd; lane++) {
           Coordinate icoor(ndim);
           grid->iCoorFromIindex(icoor, lane);
@@ -65,21 +105,19 @@ void cgpt_scale_per_coordinate(Lattice<T>& dst,Lattice<T>& src,ComplexD* s,int d
           }
           if (lane == 0) {
               Coor[idx] = coor[lidx];
-          } else {
-              if (Coor[idx] != coor[idx+lane*osites]) {
-                  simd = false;
-              }
+          }
+          if (Coor[idx] != coor[lidx]) {
+              // Need to update simd separately
+              ERR("Not implemented yet");
           }
       }
-    });
+    }
 
-  if (simd) {
+    // Scale dimension dim
     accelerator_for(idx, osites, nsimd, {
         int s_idx = Coor[idx];
         coalescedWrite(dst_p[idx], coalescedRead(src_p[idx]) * S[s_idx]);
-      });
-  } else {
-    ERR("Not implemented yet");
+      }); 
   }
   
 }
