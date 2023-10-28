@@ -63,19 +63,26 @@ void cgpt_scale_per_coordinate(Lattice<T>& dst,Lattice<T>& src,ComplexD* s,int d
         size[idx] = grid->_ldimensions[idx] * cbf;
         points *= size[idx];
     }
+    int cb, cbf;
     int fstride = 1;
-    for (int idx=0; idx < ndim; idx++) {
-        if (grid->_checker_dim_mask[idx])
-            break;
-        fstride *= size[idx];
+    if (grid->_isCheckerBoarded) {
+        for (int idx=0; idx < ndim; idx++) {
+            if (grid->_checker_dim_mask[idx])
+                break;
+            fstride *= size[idx];
+        }
+        cb = src.Checkerboard();
+        cbf = 2;
+    } else {
+        cb = 0;
+        cbf = 1;
     }
-    int cb = src.Checkerboard();
     std::vector<int32_t> _coor(osites * nsimd);
     int32_t* coor = &_coor[0];
     thread_for(idx, points, {
         Coordinate lcoor(ndim);
         Lexicographic::CoorFromIndex(lcoor,idx,size);
-        long idx_cb = (idx % fstride) + ((idx / fstride)/2) * fstride;
+        long idx_cb = (idx % fstride) + ((idx / fstride)/cbf) * fstride;
         long site_cb = 0;
         for (int i=0; i < ndim; i++)
             if (grid->_checker_dim_mask[i])

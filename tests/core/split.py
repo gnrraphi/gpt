@@ -143,8 +143,8 @@ for src in [l, l_rb]:
 # Test scale per coordinate
 ################################################################################
 for d, L in zip([0, 1, 2, 3], [12, 8, 8, 8]):
-    grid_rb = g.grid([12, 8, 8, 8, 8], g.double)
-    a = rng.cnormal(g.vcolor(grid_rb))
+    grid = g.grid([12, 8, 8, 8, 8], g.double)
+    a = rng.cnormal(g.vcolor(grid))
     b = g.lattice(a)
     sc = np.array([rng.cnormal() for i in range(L)], np.complex128)
     g.scale_per_coordinate(b, a, sc, d)
@@ -155,8 +155,8 @@ for d, L in zip([0, 1, 2, 3], [12, 8, 8, 8]):
         assert eps2 < 1e-28
 
 for d, L in zip([0, 1, 2], [12, 8, 8]):
-    grid_rb = g.grid([12, 8, 8, 8, 8], g.single)
-    a = rng.cnormal(g.vcolor(grid_rb))
+    grid = g.grid([12, 8, 8, 8, 8], g.single)
+    a = rng.cnormal(g.vcolor(grid))
     b = g.lattice(a)
     sc = np.array([rng.cnormal() for i in range(L)], np.complex128)
     g.scale_per_coordinate(b, a, sc, d)
