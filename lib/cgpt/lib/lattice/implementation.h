@@ -66,6 +66,14 @@ public:
     return ::axpy(l,(Coeff_t)a,compatible<T>(x)->l,compatible<T>(y)->l);
   }
 
+  virtual void project_irrep(cgpt_Lattice_base* src,int* dims,int* sidx,ComplexD* scale,int* deg,int nd) {
+      cgpt_project_irrep(l,compatible<T>(src)->l,dims,sidx,scale,deg,nd);
+  }
+
+  virtual void project_trivial(cgpt_Lattice_base* src,int* dims,int* sidx,ComplexD* scale,int ns,int nd) {
+      cgpt_project_trivial(l,compatible<T>(src)->l,dims,sidx,scale,ns,nd);
+  }
+
   virtual void scale_per_coordinate(cgpt_Lattice_base* src,ComplexD* s,int dim) {
     cgpt_scale_per_coordinate(l,compatible<T>(src)->l,s,dim);
   }

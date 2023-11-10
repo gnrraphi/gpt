@@ -19,6 +19,207 @@
 */
 
 template<typename T>
+void cgpt_project_irrep(Lattice<T>& dst,Lattice<T>& src,int* dims,int* sidx,ComplexD* scale,int* deg, int nd) {
+
+  GridBase* grid = dst.Grid();
+  conformable(grid, src.Grid());
+
+  dst.Checkerboard() = src.Checkerboard();
+
+  autoView(dst_v, dst, AcceleratorWriteDiscard);
+  autoView(src_v, src, AcceleratorRead);
+
+  auto dst_p = &dst_v[0];
+  auto src_p = &src_v[0];
+
+  int osites = grid->oSites();
+  int nsimd = grid->Nsimd();
+  int ndim = grid->Nd();
+  int ndo = ndim - nd;
+
+  Vector<bool> dims_mask(ndim,false);
+  for (int idx=0; idx < nd; idx++) {
+      dims_mask[dims[idx]] = true;
+  }
+
+  Coordinate Dims;
+  Coordinate Dimso;
+  for (int idx=0; idx < ndim; idx++) {
+      if (dims_mask[idx]) {
+          Dims.push_back(idx);
+      } else {
+          Dimso.push_back(idx);
+      }
+  }
+
+  Coordinate stride(nd);
+  stride[0] = 1;
+  for (int idx=0; idx < nd-1; idx++) {
+      stride[idx+1] = stride[idx] * grid->_rdimensions[Dims[idx]];
+   }
+
+  Coordinate strideo(ndo);
+  strideo[0] = 1;
+  for (int idx=0; idx < ndo-1; idx++) {
+      strideo[idx+1] = strideo[idx] * grid->_rdimensions[Dimso[idx]];
+   }
+
+  int size = stride[nd-1] * grid->_rdimensions[Dims[nd-1]];
+    
+  Vector<int> _Deg(size+1);
+  int* Deg =&_Deg[0];
+  Deg[0] = 0;
+  for(int idx=0; idx < size; idx++) {
+      Deg[idx+1] = Deg[idx] + deg[idx];
+  }
+
+  int ns = Deg[size];
+  Vector<int> _Sidx(ns);
+  int* Sidx = &_Sidx[0];
+  for(int idx=0; idx < ns; idx++) {
+      Sidx[idx] = sidx[idx];
+  }
+    
+  Vector<ComplexD> _Scale(ns);
+  ComplexD* Scale = &_Scale[0];
+  thread_for(idx, ns, {
+      Scale[idx] = scale[idx];
+    });
+
+  bool simd = false;
+  for (int idx=0; idx < nd; idx++) {
+      if (grid->_simd_layout[Dims[idx]] != 1)
+          simd = true;
+  }
+  if (simd)
+    ERR("Not implemented yet");
+    
+  typedef decltype(coalescedRead(src_v[0])) CalcElem;
+
+  accelerator_for(idx,osites,nsimd,{
+      Coordinate ocoor(ndim);  
+      Lexicographic::CoorFromIndex(ocoor,idx,grid->_rdimensions);
+      int idx_s = 0;
+      for (int i=0; i < nd; i++) {
+          idx_s += ocoor[Dims[i]] * stride[i];
+      }
+      int idx_so = 0;
+      for (int i=0; i < ndo; i++) {
+          idx_so += ocoor[Dimso[i]] * strideo[i];
+      }
+      CalcElem sElem = Zero();
+      for (int i=Deg[idx_s]; i < Deg[idx_s+1]; i++) { //Deg[-1] = n, Deg[i] = deg[i-1] + deg[i]
+          sElem += Scale[i] * coalescedRead(src_p[Sidx[i]+idx_so*size]);
+      }
+      coalescedWrite(dst_p[idx], sElem);
+  });
+  
+}
+
+template<typename T>
+void cgpt_project_trivial(Lattice<T>& dst,Lattice<T>& src,int* dims,int* sidx,ComplexD* scale,int ns,int nd) {
+
+  GridBase* grid = dst.Grid();
+  conformable(grid, src.Grid());
+
+  dst.Checkerboard() = src.Checkerboard();
+
+  autoView(dst_v, dst, AcceleratorWriteDiscard);
+  autoView(src_v, src, AcceleratorRead);
+
+  auto dst_p = &dst_v[0];
+  auto src_p = &src_v[0];
+
+  int osites = grid->oSites();
+  int nsimd = grid->Nsimd();
+  int ndim = grid->Nd();
+  int ndo = ndim - nd;
+
+  Vector<bool> dims_mask(ndim,false);
+  for (int idx=0; idx < nd; idx++) {
+      dims_mask[dims[idx]] = true;
+  }
+
+  Coordinate Dims;
+  Coordinate Dimso;
+  for (int idx=0; idx < ndim; idx++) {
+      if (dims_mask[idx]) {
+          Dims.push_back(idx);
+      } else {
+          Dimso.push_back(idx);
+      }
+  }
+
+  Coordinate stride(nd);
+  stride[0] = 1;
+  for (int idx=0; idx < nd-1; idx++) {
+      stride[idx+1] = stride[idx] * grid->_rdimensions[Dims[idx]];
+   }
+
+  Coordinate strideo(ndo);
+  strideo[0] = 1;
+  for (int idx=0; idx < ndo-1; idx++) {
+      strideo[idx+1] = strideo[idx] * grid->_rdimensions[Dimso[idx]];
+   }
+
+  int size = stride[nd-1] * grid->_rdimensions[Dims[nd-1]];
+  int sizeo = strideo[ndo-1] * grid->_rdimensions[Dimso[ndo-1]];
+
+  Vector<int> _Sidx(size);
+  int* Sidx = &_Sidx[0];
+  for(int idx=0; idx < size; idx++) {
+      Sidx[idx] = sidx[idx];
+  }
+    
+  Vector<ComplexD> _Scale(ns);
+  ComplexD* Scale = &_Scale[0];
+  thread_for(idx, ns, {
+      Scale[idx] = scale[idx];
+    });
+
+  typedef decltype(coalescedRead(src_v[0])) CalcElem;
+  Vector<CalcElem> _sElem(ns*sizeo,Zero());
+  CalcElem* sElem = &_sElem[0];
+
+  bool simd = false;
+  for (int idx=0; idx < nd; idx++) {
+      if (grid->_simd_layout[Dims[idx]] != 1)
+          simd = true;
+  }
+  if (simd)
+    ERR("Not implemented yet");
+
+  for(int idx=0; idx < osites; idx++) {
+      Coordinate ocoor(ndim);  
+      Lexicographic::CoorFromIndex(ocoor,idx,grid->_rdimensions);
+      int idx_s = 0;
+      for (int i=0; i < nd; i++) {
+          idx_s += ocoor[Dims[i]] * stride[i];
+      }
+      int idx_so = 0;
+      for (int i=0; i < ndo; i++) {
+          idx_so += ocoor[Dimso[i]] * strideo[i];
+      }
+      sElem[Sidx[idx_s]+idx_so*ns] += coalescedRead(src_p[idx]);
+  }
+
+  accelerator_for(idx,osites,nsimd,{
+      Coordinate ocoor(ndim);  
+      Lexicographic::CoorFromIndex(ocoor,idx,grid->_rdimensions);
+      int idx_s = 0;
+      for (int i=0; i < nd; i++) {
+          idx_s += ocoor[Dims[i]] * stride[i];
+      }
+      int idx_so = 0;
+      for (int i=0; i < ndo; i++) {
+          idx_so += ocoor[Dimso[i]] * strideo[i];
+      }
+      coalescedWrite(dst_p[idx], sElem[Sidx[idx_s]+idx_so*ns] * Scale[Sidx[idx_s]]);
+  });
+  
+}
+
+template<typename T>
 void cgpt_scale_per_coordinate(Lattice<T>& dst,Lattice<T>& src,ComplexD* s,int dim) {
 
   GridBase* grid = dst.Grid();

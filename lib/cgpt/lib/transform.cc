@@ -218,6 +218,81 @@ EXPORT(lattice_axpy,{
     return PyLong_FromLong(0);
   });
 
+EXPORT(lattice_project_irrep,{
+    
+    void* _d,*_s;
+    PyObject* _a,*_b,*_c,*_e;
+    if (!PyArg_ParseTuple(args, "llOOOO", &_d,&_s,&_a,&_b,&_c,&_e)) {
+      return NULL;
+    }
+    
+    cgpt_Lattice_base* d = (cgpt_Lattice_base*)_d;
+    cgpt_Lattice_base* s = (cgpt_Lattice_base*)_s;
+
+    int* a;
+    int na;
+    cgpt_numpy_import_vector(_a,a,na);
+
+    int* b;
+    int nb;
+    cgpt_numpy_import_vector(_b,b,nb);
+
+    ComplexD* c;
+    int nc;
+    cgpt_numpy_import_vector(_c,c,nc);
+    
+    int* e;
+    int ne;
+    cgpt_numpy_import_vector(_e,e,ne);
+
+    ASSERT(!d->get_grid()->_isCheckerBoarded);
+    ASSERT((0 <= na) && (na < d->get_grid()->Nd()));
+//  TODO: ASSERT(nb, nc, ne == ??)
+
+    d->project_irrep(s,a,b,c,e,na);
+    
+    return PyLong_FromLong(0);
+  });
+
+EXPORT(lattice_project_trivial,{
+    
+    void* _d,*_s;
+    PyObject* _a,*_b,*_c;
+    long n;
+    if (!PyArg_ParseTuple(args, "llOOOl", &_d,&_s,&_a,&_b,&_c,&n)) {
+      return NULL;
+    }
+    
+    cgpt_Lattice_base* d = (cgpt_Lattice_base*)_d;
+    cgpt_Lattice_base* s = (cgpt_Lattice_base*)_s;
+
+    int* a;
+    int na;
+    cgpt_numpy_import_vector(_a,a,na);
+
+    int* b;
+    int nb;
+    cgpt_numpy_import_vector(_b,b,nb);
+
+    int nb_ = 1;
+    for (int i=0; i < na; i++) {
+        nb_ *= d->get_grid()->_fdimensions[a[i]];
+    }
+
+    ComplexD* c;
+    int nc;
+    cgpt_numpy_import_vector(_c,c,nc);
+
+    ASSERT(!d->get_grid()->_isCheckerBoarded);
+    ASSERT((0 <= na) && (na < d->get_grid()->Nd()));
+    ASSERT(nb_ == nb);
+    ASSERT(n == nc);
+    
+    d->project_trivial(s,a,b,c,n,na);
+    
+    return PyLong_FromLong(0);
+  });
+
 EXPORT(lattice_scale_per_coordinate,{
     
     void* _d,*_s;

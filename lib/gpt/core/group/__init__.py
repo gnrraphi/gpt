@@ -25,3 +25,11 @@ from gpt.core.group.operation import (
 )
 from gpt.core.group.differentiable_functional import differentiable_functional
 from gpt.core.group.diffeomorphism import diffeomorphism
+from gpt.core.group.project import (
+    project_irrep,
+    project_trivial
+)
+from gpt.core.group.point_group import (
+    project_to_irrep,
+    point_group
+)

@@ -55,6 +55,8 @@ public:
   virtual void set_checkerboard_from(cgpt_Lattice_base* src) = 0;
   virtual void change_checkerboard(int cb) = 0;
   virtual int get_checkerboard() = 0;
+  virtual void project_irrep(cgpt_Lattice_base* src,int* dims,int* sidx,ComplexD* scale,int* deg,int nd) = 0;
+  virtual void project_trivial(cgpt_Lattice_base* src,int* dims,int* sidx,ComplexD* scale,int ns,int nd) = 0;
   virtual void scale_per_coordinate(cgpt_Lattice_base* src,ComplexD* s,int dim) = 0;
   virtual void basis_rotate(std::vector<cgpt_Lattice_base*> &basis,RealD* Qt,int j0, int j1, int k0,int k1,int Nm,bool use_accelerator) = 0;
   virtual void basis_rotate(std::vector<cgpt_Lattice_base*> &basis,ComplexD* Qt,int j0, int j1, int k0,int k1,int Nm,bool use_accelerator) = 0;
