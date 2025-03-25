@@ -20,3 +20,7 @@
 from gpt.qcd.scalar.action.phi4 import phi4
 from gpt.qcd.scalar.action.mass_term import mass_term, fourier_mass_term, general_mass_term
 from gpt.qcd.scalar.action.coupling import coupling
+from gpt.qcd.scalar.action.sigma import (
+    linear_sigma_model,
+    non_linear_sigma_model,
+)
