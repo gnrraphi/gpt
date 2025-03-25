@@ -113,6 +113,30 @@ EXPORT(random_sample,{
 
   });
 
+EXPORT(multi_cluster,{
+    
+    void* _p;
+    void* _s, *_pp;
+    PyObject* _param;
+    if (!PyArg_ParseTuple(args, "lllO", &_p,&_s,&_pp,&_param)) {
+      return NULL;
+    }
+
+    cgpt_random_engine_base* p = (cgpt_random_engine_base*)_p;
+
+    cgpt_Lattice_base* s = (cgpt_Lattice_base*)_s;
+    cgpt_Lattice_base* pp = (cgpt_Lattice_base*)_pp;
+
+    long nc, nf;
+
+    p->multi_cluster(s,pp,_param, nc, nf);
+
+    // return PyLong_FromLong(0);
+    return Py_BuildValue("(NN)",
+        PyLong_FromLong(nc),
+        PyLong_FromLong(nf));
+  });
+
 // the following allow the bigcrush test to link directly against this
 struct cgpt_rng_test {
   std::vector<cgpt_random_engine_base*> engines;
